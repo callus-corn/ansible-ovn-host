@@ -1,0 +1,7 @@
+#!/bin/bash
+
+nmcli c del {{ default_ifname[inventory_hostname] }}
+ovs-vsctl add-br {{ ovs_bridge }}
+ovs-vsctl add-port {{ ovs_bridge }} {{ default_ifname[inventory_hostname] }}
+ip link set {{ ovs_bridge }} up
+ip address add {{ ansible_host }}/{{ default_subnet_length[inventory_hostname] }} dev {{ ovs_bridge }}

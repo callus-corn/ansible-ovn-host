@@ -1,0 +1,25 @@
+---
+
+- name: start ovs
+  hosts: ovn_host
+  become: yes
+  tasks:
+
+    - name: start ovs
+      import_role:
+        name: ovn_host
+      vars:
+        ovn_host_action: start_ovs
+      tags: start_ovn_host
+
+- name: start ovn host
+  hosts: ovn_host
+  become: yes
+  tasks:
+
+    - name: start ovn host
+      import_role:
+        name: ovn_host
+      vars:
+        ovn_host_action: start
+      tags: start_ovn_host

@@ -1,0 +1,107 @@
+---
+
+- name: make directory
+  file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ ovs_etc_dir }}"
+    - "{{ ovs_log_dir }}"
+    - "{{ ovs_run_dir }}"
+
+- name: check openvswitch module
+  command: >-
+    lsmod
+  register: lsmod
+  changed_when: false
+
+- name: enable openvswitch
+  command: >-
+    modprobe openvswitch
+  changed_when: true
+  when: not ("openvswitch" in lsmod.stdout)
+
+- name: check vtep db
+  stat:
+    path: "{{ ovs_etc_dir }}/{{ ovs_vtep_db_name }}.db"
+  register: vtep_db
+
+- name: create vtep db schema
+  command: >-
+    ovsdb-tool create
+      {{ ovs_etc_dir }}/{{ ovs_vtep_db_name }}.db
+      {{ ovs_vtep_schema_file_path }}
+  changed_when: true
+  when: not (vtep_db.stat.exists | bool)
+
+- name: check conf db
+  stat:
+    path: "{{ ovs_etc_dir }}/{{ ovs_conf_db_name }}.db"
+  register: conf_db
+
+- name: create conf db schema
+  command: >-
+    ovsdb-tool create
+      {{ ovs_etc_dir }}/{{ ovs_conf_db_name }}.db
+      {{ ovs_conf_schema_file_path }}
+  changed_when: true
+  when: not (conf_db.stat.exists | bool)
+
+- name: check ovs_db pid
+  stat:
+    path: "{{ ovs_run_dir }}/{{ ovs_db_name }}.pid"
+  register: ovs_db
+
+- name: run ovs db
+  command: >-
+    ovsdb-server
+      --remote=punix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      --detach
+      --pidfile={{ ovs_run_dir }}/{{ ovs_db_name }}.pid
+      --log-file={{ ovs_log_dir }}/{{ ovs_db_name }}.log
+      {{ ovs_etc_dir }}/{{ ovs_vtep_db_name }}.db
+      {{ ovs_etc_dir }}/{{ ovs_conf_db_name }}.db
+  changed_when: true
+  when: not (ovs_db.stat.exists | bool)
+
+- name: init ovs db
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      --no-wait
+      init
+  changed_when: true
+  when: not (ovs_db.stat.exists | bool)
+
+- name: check vswitchd pid
+  stat:
+    path: "{{ ovs_run_dir }}/vswitchd.pid"
+  register: vswitchd
+
+- name: start vswitchd
+  command: >-
+    ovs-vswitchd
+      --pidfile={{ ovs_run_dir }}/vswitchd.pid
+      --detach
+      --log-file={{ ovs_log_dir }}/vswitchd.log
+      unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+  changed_when: true
+  when: not (vswitchd.stat.exists | bool)
+
+- name: check {{ ovs_bridge }} is exist
+  stat:
+    path: /sys/class/net/{{ ovs_bridge }}/address
+  register: bridge
+
+- name: put bridge script
+  template:
+    src: ovs_bridge.sh.j2
+    dest: /tmp/ovs_bridge.sh
+    owner: root
+    mode: 0755
+  when: not bridge.stat.exists
+
+- name: create ovs bridge
+  command: >-
+    /tmp/ovs_bridge.sh ; rm /tmp/ovs_bridge.sh
+  when: not bridge.stat.exists

@@ -1,0 +1,17 @@
+---
+
+- name: setup bridge
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      set open .
+      external-ids:ovn-bridge-mappings={{ ovn_physical_network_name }}:{{ ovs_bridge }}
+  changed_when: true
+
+- name: setup network
+  command: >-
+    ovn-nbctl
+      --db=tcp:{{ ovn_remote_ip }}:{{ ovn_nb_port }}
+      lrp-set-gateway-chassis {{ ovn_router_port['public']['name'] }}
+      {{ ovn_system_ids[inventory_hostname] }}
+  changed_when: true

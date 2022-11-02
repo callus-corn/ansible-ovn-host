@@ -1,0 +1,65 @@
+---
+
+- name: make directory
+  file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ ovn_etc_dir }}"
+    - "{{ ovn_log_dir }}"
+    - "{{ ovn_run_dir }}"
+
+- name: setup system-id
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      set open .
+      external-ids:system-id={{ ovn_system_ids[inventory_hostname] }}
+  changed_when: true
+
+- name: setup ovn remote (sb)
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      set open .
+      external-ids:ovn-remote=tcp:{{ ovn_remote_ip }}:{{ ovn_sb_port }}
+  changed_when: true
+
+- name: setup encap-type
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      set open .
+      external-ids:ovn-encap-type={{ ovn_encap_type }}
+  changed_when: true
+
+- name: setup ovn encap-ip
+  command: >-
+    ovs-vsctl
+      --db=unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+      set open .
+      external-ids:ovn-encap-ip={{ ansible_host }}
+  changed_when: true
+
+- name: check ovn-controller
+  stat:
+    path: "{{ ovn_run_dir }}/controller.pid"
+  register: controller
+
+- name: start ovn host
+  command: >-
+    ovn-controller
+      --pidfile={{ ovn_run_dir }}/controller.pid
+      --detach
+      --log-file={{ ovn_log_dir }}/controller.log
+      unix:{{ ovs_run_dir }}/{{ ovs_db_name }}.sock
+  changed_when: true
+  when: not (controller.stat.exists | bool)
+
+- name: port open
+  firewalld:
+    zone: public
+    port: "{{ ovn_encap_port }}/udp"
+    permanent: yes
+    immediate: yes
+    state: enabled

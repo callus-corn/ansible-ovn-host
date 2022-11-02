@@ -1,0 +1,71 @@
+---
+
+- name: install requirements packages
+  dnf:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  loop: "{{ ovn_requirements_packages_dnf }}"
+
+- name: install requirements pip packages
+  pip:
+    name: "{{ item }}"
+  loop: "{{ ovn_requirements_packages_pip }}"
+
+- name: git clone
+  git:
+    repo: "{{ ovs_repo }}"
+    dest: "{{ ovs_repo_dir }}"
+    version: "{{ ovs_version }}"
+
+- name: boot.sh
+  command: >-
+    chdir={{ ovs_repo_dir }} ./boot.sh
+  changed_when: true
+
+- name: configure
+  command: >-
+    chdir={{ ovs_repo_dir }} ./configure
+      --prefix=/usr
+      --localstatedir=/var
+      --sysconfdir=/etc
+  changed_when: true
+
+- name: make
+  command: >-
+    chdir={{ ovs_repo_dir }} make
+  changed_when: true
+
+- name: make install
+  command: >-
+    chdir={{ ovs_repo_dir }} make install
+  changed_when: true
+
+- name: git clone
+  git:
+    repo: "{{ ovn_repo }}"
+    dest: "{{ ovn_repo_dir }}"
+    version: "{{ ovn_version }}"
+
+- name: boot.sh
+  command: >-
+    chdir={{ ovn_repo_dir }} ./boot.sh
+  changed_when: true
+
+- name: configure
+  command: >-
+    chdir={{ ovn_repo_dir }} ./configure
+      --prefix=/usr
+      --localstatedir=/var
+      --sysconfdir=/etc
+      --with-ovs-source={{ ovs_repo_dir}}
+  changed_when: true
+
+- name: make
+  command: >-
+    chdir={{ ovn_repo_dir }} make
+  changed_when: true
+
+- name: make install
+  command: >-
+    chdir={{ ovn_repo_dir }} make install
+  changed_when: true
