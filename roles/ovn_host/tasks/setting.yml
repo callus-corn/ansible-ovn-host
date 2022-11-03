@@ -15,3 +15,19 @@
       lrp-set-gateway-chassis {{ ovn_router_port['public']['name'] }}
       {{ ovn_system_ids[inventory_hostname] }}
   changed_when: true
+
+- name: check default route
+  command: >-
+    ip r
+  register: routing_table
+
+- name: setup default route
+  command: >-
+    ip r add default via {{ ovn_default_route }}
+  when: not 'default' in routing_table.stdout
+  changed_when: true
+
+- name: setup resolv.conf
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
